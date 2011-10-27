@@ -39,16 +39,6 @@ cudaChannelFormatDesc channelDesc;
 
 #define REG_TILE_NBASELINE ((NSTATION/2+1)*(NSTATION/4))
 
-#ifndef FIXED_POINT
-// texture declaration for FP32 reads
-texture<float2, 1, cudaReadModeElementType> tex1dfloat2;
-texture<float2, 2, cudaReadModeElementType> tex2dfloat2;
-#else
-// texture declaration for 8-bit fixed point reads
-texture<char2, 1, cudaReadModeNormalizedFloat> tex1dfloat2;
-texture<char2, 2, cudaReadModeNormalizedFloat> tex2dfloat2;
-#endif
-
 // array holding indices for which matrix we are doing the output to at a given iteration
 #if (NPULSAR > 0)
 __device__ __constant__ unsigned char tIndex[PIPE_LENGTH*NFREQUENCY];
@@ -72,141 +62,122 @@ CUBE_DEVICE(void, findPosition, unsigned int &Col, unsigned int &Row, unsigned i
   Col = (blockX*TILE_WIDTH + threadIdx.x);
 }
 
-__device__ void operator+=( float4 &a, const float4 b ) {
+__device__ void operator+=( int4 &a, const int4 b ) {
   a.x += b.x; a.y += b.y; a.z += b.z; a.w += b.w;
 }
 
 // device function to write out the matrix elements
-CUBE_DEVICE(void, write2x2, unsigned int &Col, unsigned int &Row, float4 *matrix_real, float4 *matrix_imag, 
-	    float sum11XXreal, float sum11XXimag, float sum11XYreal, float sum11XYimag,
-	    float sum11YXreal, float sum11YXimag, float sum11YYreal, float sum11YYimag,
-	    float sum12XXreal, float sum12XXimag, float sum12XYreal, float sum12XYimag,
-	    float sum12YXreal, float sum12YXimag, float sum12YYreal, float sum12YYimag,
-	    float sum21XXreal, float sum21XXimag, float sum21XYreal, float sum21XYimag,
-	    float sum21YXreal, float sum21YXimag, float sum21YYreal, float sum21YYimag,
-	    float sum22XXreal, float sum22XXimag, float sum22XYreal, float sum22XYimag,
-	    float sum22YXreal, float sum22YXimag, float sum22YYreal, float sum22YYimag) {
+CUBE_DEVICE(void, write2x2, unsigned int &Col, unsigned int &Row, int4 *matrix_real, int4 *matrix_imag, 
+	    int sum11XXreal, int sum11XXimag, int sum11XYreal, int sum11XYimag,
+	    int sum11YXreal, int sum11YXimag, int sum11YYreal, int sum11YYimag,
+	    int sum12XXreal, int sum12XXimag, int sum12XYreal, int sum12XYimag,
+	    int sum12YXreal, int sum12YXimag, int sum12YYreal, int sum12YYimag,
+	    int sum21XXreal, int sum21XXimag, int sum21XYreal, int sum21XYimag,
+	    int sum21YXreal, int sum21YXimag, int sum21YYreal, int sum21YYimag,
+	    int sum22XXreal, int sum22XXimag, int sum22XYreal, int sum22XYimag,
+	    int sum22YXreal, int sum22YXimag, int sum22YYreal, int sum22YYimag) {
   
   int f=blockIdx.y;
 
 #if (MATRIX_ORDER == REGISTER_TILE_TRIANGULAR_ORDER) // write out the register tiles separately
   matrix_real[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*0 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum11XXreal, SCALE*sum11XYreal, SCALE*sum11YXreal, SCALE*sum11YYreal);
+    make_int4(SCALE*sum11XXreal, SCALE*sum11XYreal, SCALE*sum11YXreal, SCALE*sum11YYreal);
   matrix_imag[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*0 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum11XXimag, SCALE*sum11XYimag, SCALE*sum11YXimag, SCALE*sum11YYimag);
+    make_int4(SCALE*sum11XXimag, SCALE*sum11XYimag, SCALE*sum11YXimag, SCALE*sum11YYimag);
 
   matrix_real[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*1 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum21XXreal, SCALE*sum21XYreal, SCALE*sum21YXreal, SCALE*sum21YYreal);
+    make_int4(SCALE*sum21XXreal, SCALE*sum21XYreal, SCALE*sum21YXreal, SCALE*sum21YYreal);
   matrix_imag[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*1 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum21XXimag, SCALE*sum21XYimag, SCALE*sum21YXimag, SCALE*sum21YYimag);
+    make_int4(SCALE*sum21XXimag, SCALE*sum21XYimag, SCALE*sum21YXimag, SCALE*sum21YYimag);
 
   matrix_real[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*3 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum22XXreal, SCALE*sum22XYreal, SCALE*sum22YXreal, SCALE*sum22YYreal);
+    make_int4(SCALE*sum22XXreal, SCALE*sum22XYreal, SCALE*sum22YXreal, SCALE*sum22YYreal);
   matrix_imag[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*3 + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum22XXimag, SCALE*sum22XYimag, SCALE*sum22YXimag, SCALE*sum22YYimag);
+    make_int4(SCALE*sum22XXimag, SCALE*sum22XYimag, SCALE*sum22YXimag, SCALE*sum22YYimag);
   
   // Test if entire tile needs to be written or just 3 of 4 parts (exclude top-right)
   if (Col<Row) {
     matrix_real[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*2 + (Row*(Row+1)/2) + Col] += 
-      make_float4(SCALE*sum12XXreal, SCALE*sum12XYreal, SCALE*sum12YXreal, SCALE*sum12YYreal);
+      make_int4(SCALE*sum12XXreal, SCALE*sum12XYreal, SCALE*sum12YXreal, SCALE*sum12YYreal);
     matrix_imag[f*4*REG_TILE_NBASELINE + REG_TILE_NBASELINE*2 + (Row*(Row+1)/2) + Col] += 
-      make_float4(SCALE*sum12XXimag, SCALE*sum12XYimag, SCALE*sum12YXimag, SCALE*sum12YYimag);
+      make_int4(SCALE*sum12XXimag, SCALE*sum12XYimag, SCALE*sum12YXimag, SCALE*sum12YYimag);
   }
 #elif (MATRIX_ORDER == REAL_IMAG_TRIANGULAR_ORDER) // write out the real and imaginary components separately
   Col*=2; Row*=2;
   matrix_real[f*NBASELINE + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum11XXreal, SCALE*sum11XYreal, SCALE*sum11YXreal, SCALE*sum11YYreal);
+    make_int4(SCALE*sum11XXreal, SCALE*sum11XYreal, SCALE*sum11YXreal, SCALE*sum11YYreal);
   matrix_imag[f*NBASELINE + (Row*(Row+1)/2) + Col] += 
-    make_float4(SCALE*sum11XXimag, SCALE*sum11XYimag, SCALE*sum11YXimag, SCALE*sum11YYimag);
+    make_int4(SCALE*sum11XXimag, SCALE*sum11XYimag, SCALE*sum11YXimag, SCALE*sum11YYimag);
 
   matrix_real[f*NBASELINE + ((Row+1)*(Row+2)/2) + Col] += 
-    make_float4(SCALE*sum21XXreal, SCALE*sum21XYreal, SCALE*sum21YXreal, SCALE*sum21YYreal);
+    make_int4(SCALE*sum21XXreal, SCALE*sum21XYreal, SCALE*sum21YXreal, SCALE*sum21YYreal);
   matrix_imag[f*NBASELINE + ((Row+1)*(Row+2)/2) + Col] += 
-    make_float4(SCALE*sum21XXimag, SCALE*sum21XYimag, SCALE*sum21YXimag, SCALE*sum21YYimag);
+    make_int4(SCALE*sum21XXimag, SCALE*sum21XYimag, SCALE*sum21YXimag, SCALE*sum21YYimag);
 
   matrix_real[f*NBASELINE + ((Row+1)*(Row+2)/2) + (Col+1)] += 
-    make_float4(SCALE*sum22XXreal, SCALE*sum22XYreal, SCALE*sum22YXreal, SCALE*sum22YYreal);
+    make_int4(SCALE*sum22XXreal, SCALE*sum22XYreal, SCALE*sum22YXreal, SCALE*sum22YYreal);
   matrix_imag[f*NBASELINE + ((Row+1)*(Row+2)/2) + (Col+1)] += 
-    make_float4(SCALE*sum22XXimag, SCALE*sum22XYimag, SCALE*sum22YXimag, SCALE*sum22YYimag);
+    make_int4(SCALE*sum22XXimag, SCALE*sum22XYimag, SCALE*sum22YXimag, SCALE*sum22YYimag);
   
   // Test if entire tile needs to be written or just 3 of 4 parts (exclude top-right)
   if (Col<Row) {
     matrix_real[f*NBASELINE + (Row*(Row+1)/2) + (Col+1)] += 
-      make_float4(SCALE*sum12XXreal, SCALE*sum12XYreal, SCALE*sum12YXreal, SCALE*sum12YYreal);
+      make_int4(SCALE*sum12XXreal, SCALE*sum12XYreal, SCALE*sum12YXreal, SCALE*sum12YYreal);
     matrix_imag[f*NBASELINE + (Row*(Row+1)/2) + (Col+1)] += 
-      make_float4(SCALE*sum12XXimag, SCALE*sum12XYimag, SCALE*sum12YXimag, SCALE*sum12YYimag);
+      make_int4(SCALE*sum12XXimag, SCALE*sum12XYimag, SCALE*sum12YXimag, SCALE*sum12YYimag);
   }
 #else  // standard triangular packed order
   Col*=2; Row*=2;
   matrix_real[(f*NBASELINE + (Row*(Row+1)/2) + Col)*NPOL + 0] += 
-    make_float4(SCALE*sum11XXreal, SCALE*sum11XXimag, SCALE*sum11XYreal, SCALE*sum11XYimag);
+    make_int4(SCALE*sum11XXreal, SCALE*sum11XXimag, SCALE*sum11XYreal, SCALE*sum11XYimag);
   matrix_real[(f*NBASELINE + (Row*(Row+1)/2) + Col)*NPOL + 1] += 
-    make_float4(SCALE*sum11YXreal, SCALE*sum11YXimag, SCALE*sum11YYreal, SCALE*sum11YYimag);
+    make_int4(SCALE*sum11YXreal, SCALE*sum11YXimag, SCALE*sum11YYreal, SCALE*sum11YYimag);
   matrix_real[(f*NBASELINE + ((Row+1)*(Row+2)/2) + Col)*NPOL + 0] += 
-    make_float4(SCALE*sum21XXreal, SCALE*sum21XXimag, SCALE*sum21XYreal, SCALE*sum21XYimag);
+    make_int4(SCALE*sum21XXreal, SCALE*sum21XXimag, SCALE*sum21XYreal, SCALE*sum21XYimag);
   matrix_real[(f*NBASELINE + ((Row+1)*(Row+2)/2) + Col)*NPOL + 1] += 
-    make_float4(SCALE*sum21YXreal, SCALE*sum21YXimag, SCALE*sum21YYreal, SCALE*sum21YYimag);
+    make_int4(SCALE*sum21YXreal, SCALE*sum21YXimag, SCALE*sum21YYreal, SCALE*sum21YYimag);
   matrix_real[(f*NBASELINE + ((Row+1)*(Row+2)/2) + (Col+1))*NPOL + 0] += 
-    make_float4(SCALE*sum22XXreal, SCALE*sum22XXimag, SCALE*sum22XYreal, SCALE*sum22XYimag);
+    make_int4(SCALE*sum22XXreal, SCALE*sum22XXimag, SCALE*sum22XYreal, SCALE*sum22XYimag);
   matrix_real[(f*NBASELINE + ((Row+1)*(Row+2)/2) + (Col+1))*NPOL + 1] += 
-    make_float4(SCALE*sum22YXreal, SCALE*sum22YXimag, SCALE*sum22YYreal, SCALE*sum22YYimag);
+    make_int4(SCALE*sum22YXreal, SCALE*sum22YXimag, SCALE*sum22YYreal, SCALE*sum22YYimag);
   
   // Test if entire tile needs to be written or just 3 of 4 parts (exclude top-right)
   if (Col<Row) {
     matrix_real[(f*NBASELINE + (Row*(Row+1)/2) + (Col+1))*NPOL + 0] += 
-      make_float4(SCALE*sum12XXreal, SCALE*sum12XXimag, SCALE*sum12XYreal, SCALE*sum12XYimag);
+      make_int4(SCALE*sum12XXreal, SCALE*sum12XXimag, SCALE*sum12XYreal, SCALE*sum12XYimag);
     matrix_real[(f*NBASELINE + (Row*(Row+1)/2) + (Col+1))*NPOL + 1] += 
-      make_float4(SCALE*sum12YXreal, SCALE*sum12YXimag, SCALE*sum12YYreal, SCALE*sum12YYimag);
+      make_int4(SCALE*sum12YXreal, SCALE*sum12YXimag, SCALE*sum12YYreal, SCALE*sum12YYimag);
   }
 #endif
 
 }
 
-// Define TEXTURE_DIM as 1 to use 1D texture (more accurate, costs 1 mult per LOAD)
-// Define TEXTURE_DIM as 2 to use 2D texture (less accurate, saves 1 mult per LOAD)
-#ifndef TEXTURE_DIM
-#define TEXTURE_DIM 1
-#endif
-
-#if TEXTURE_DIM == 1
-// Read in column in first warp as float2, row in second warp (still true for 1D?)
+// Read in column in first warp as char2, row in second warp
 #define LOAD(s, t)							\
-  {float2 temp = tex1Dfetch(tex1dfloat2, array_index + (t)*NFREQUENCY*Nstation*NPOL);			\
+  {char2 temp = array_input[array_index + (t)*NFREQUENCY*Nstation*NPOL];			\
     CUBE_ADD_BYTES(sizeof(ComplexInput));				\
     *(input##s##_p) = temp.x;						\
     *(input##s##_p + 4*TILE_WIDTH) = temp.y;}
 
-#elif TEXTURE_DIM == 2
-// Read in column in first warp as float2, row in second warp
-#define LOAD(s, t)							\
-  {float2 temp = tex2D(tex2dfloat2, array_index, t);			\
-    CUBE_ADD_BYTES(sizeof(ComplexInput));				\
-    *(input##s##_p) = temp.x;						\
-    *(input##s##_p + 4*TILE_WIDTH) = temp.y;}
-
-#else
-#error TEXTURE_DIM must be 1 or 2
-#endif
-
-// read in shared data as individual floats to avoid bank conflicts
+// read in shared data as individual ints to avoid bank conflicts
 
 #define TWO_BY_TWO_COMPUTE(s)						\
-  {float col1Xreal = input[s][4*tx];					\
-  float col1Ximag = input[s][4*tx + 4*TILE_WIDTH];			\
-  float col1Yreal = input[s][4*tx + 1];					\
-  float col1Yimag = input[s][4*tx + 1 + 4*TILE_WIDTH];			\
-  float col2Xreal = input[s][4*tx + 2];					\
-  float col2Ximag = input[s][4*tx + 2 + 4*TILE_WIDTH];			\
-  float col2Yreal = input[s][4*tx + 3];					\
-  float col2Yimag = input[s][4*tx + 3 + 4*TILE_WIDTH];			\
-  float row1Xreal = input[s][4*ty + 8*TILE_WIDTH];			\
-  float row1Ximag = input[s][4*ty + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
-  float row1Yreal = input[s][4*ty + 1 + 8*TILE_WIDTH];			\
-  float row1Yimag = input[s][4*ty + 1 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
-  float row2Xreal = input[s][4*ty + 2 + 8*TILE_WIDTH];			\
-  float row2Ximag = input[s][4*ty + 2 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
-  float row2Yreal = input[s][4*ty + 3 + 8*TILE_WIDTH];			\
-  float row2Yimag = input[s][4*ty + 3 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
+  {int col1Xreal = input[s][4*tx];					\
+  int col1Ximag = input[s][4*tx + 4*TILE_WIDTH];			\
+  int col1Yreal = input[s][4*tx + 1];					\
+  int col1Yimag = input[s][4*tx + 1 + 4*TILE_WIDTH];			\
+  int col2Xreal = input[s][4*tx + 2];					\
+  int col2Ximag = input[s][4*tx + 2 + 4*TILE_WIDTH];			\
+  int col2Yreal = input[s][4*tx + 3];					\
+  int col2Yimag = input[s][4*tx + 3 + 4*TILE_WIDTH];			\
+  int row1Xreal = input[s][4*ty + 8*TILE_WIDTH];			\
+  int row1Ximag = input[s][4*ty + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
+  int row1Yreal = input[s][4*ty + 1 + 8*TILE_WIDTH];			\
+  int row1Yimag = input[s][4*ty + 1 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
+  int row2Xreal = input[s][4*ty + 2 + 8*TILE_WIDTH];			\
+  int row2Ximag = input[s][4*ty + 2 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
+  int row2Yreal = input[s][4*ty + 3 + 8*TILE_WIDTH];			\
+  int row2Yimag = input[s][4*ty + 3 + 4*TILE_HEIGHT + 8*TILE_WIDTH];	\
   sum11XXreal += row1Xreal * col1Xreal;					\
   sum11XXreal += row1Ximag * col1Ximag;					\
   sum11XXimag += row1Ximag * col1Xreal;					\
@@ -272,7 +243,7 @@ CUBE_DEVICE(void, write2x2, unsigned int &Col, unsigned int &Row, float4 *matrix
   sum22YYimag += row2Yimag * col2Yreal;					\
   sum22YYimag -= row2Yreal * col2Yimag;}
 
-CUBE_KERNEL(shared2x2float2, float4 *matrix_real, float4 *matrix_imag, const int Nstation, const int write)
+CUBE_KERNEL(shared2x2float2, char2 *array_input, int4 *matrix_real, int4 *matrix_imag, const int Nstation, const int write)
 {
   CUBE_START;
 
@@ -288,30 +259,30 @@ CUBE_KERNEL(shared2x2float2, float4 *matrix_real, float4 *matrix_imag, const int
   CUBE_DEVICE_CALL(findPosition, Col, Row, blockX, blockY);
 
   //declare shared memory for input coalescing
-  __shared__ float input[2][16*TILE_WIDTH]; // 4* for float4, 2* for 2x2 tile size
+  __shared__ int input[2][16*TILE_WIDTH]; // 4* for int4, 2* for 2x2 tile size
 
   //instantiate sum variables
-  float sum11XXreal = 0.0, sum11XXimag = 0.0;
-  float sum11XYreal = 0.0, sum11XYimag = 0.0;
-  float sum11YXreal = 0.0, sum11YXimag = 0.0;
-  float sum11YYreal = 0.0, sum11YYimag = 0.0;
-  float sum12XXreal = 0.0, sum12XXimag = 0.0;
-  float sum12XYreal = 0.0, sum12XYimag = 0.0;
-  float sum12YXreal = 0.0, sum12YXimag = 0.0;
-  float sum12YYreal = 0.0, sum12YYimag = 0.0;
-  float sum21XXreal = 0.0, sum21XXimag = 0.0;
-  float sum21XYreal = 0.0, sum21XYimag = 0.0;
-  float sum21YXreal = 0.0, sum21YXimag = 0.0;
-  float sum21YYreal = 0.0, sum21YYimag = 0.0;
-  float sum22XXreal = 0.0, sum22XXimag = 0.0;
-  float sum22XYreal = 0.0, sum22XYimag = 0.0;
-  float sum22YXreal = 0.0, sum22YXimag = 0.0;
-  float sum22YYreal = 0.0, sum22YYimag = 0.0;
+  int sum11XXreal = 0.0, sum11XXimag = 0.0;
+  int sum11XYreal = 0.0, sum11XYimag = 0.0;
+  int sum11YXreal = 0.0, sum11YXimag = 0.0;
+  int sum11YYreal = 0.0, sum11YYimag = 0.0;
+  int sum12XXreal = 0.0, sum12XXimag = 0.0;
+  int sum12XYreal = 0.0, sum12XYimag = 0.0;
+  int sum12YXreal = 0.0, sum12YXimag = 0.0;
+  int sum12YYreal = 0.0, sum12YYimag = 0.0;
+  int sum21XXreal = 0.0, sum21XXimag = 0.0;
+  int sum21XYreal = 0.0, sum21XYimag = 0.0;
+  int sum21YXreal = 0.0, sum21YXimag = 0.0;
+  int sum21YYreal = 0.0, sum21YYimag = 0.0;
+  int sum22XXreal = 0.0, sum22XXimag = 0.0;
+  int sum22XYreal = 0.0, sum22XYimag = 0.0;
+  int sum22YXreal = 0.0, sum22YXimag = 0.0;
+  int sum22YYreal = 0.0, sum22YYimag = 0.0;
 
-  float *input0_p = input[0] + tid;
-  float *input1_p = input[1] + tid;
+  int *input0_p = input[0] + tid;
+  int *input1_p = input[1] + tid;
   unsigned int array_index = f*Nstation*NPOL + tid;
-  //float array_index = f*Nstation*NPOL + tid;
+  //int array_index = f*Nstation*NPOL + tid;
   if (tid < 4*TILE_WIDTH) {
     array_index += 2*blockX*TILE_WIDTH*NPOL;
   } else {
@@ -517,15 +488,9 @@ void cudaXengine(Complex *matrix_h, ComplexInput *array_h) {
     array_load = array_d[p%2];
 
     // Kernel Calculation
-#if TEXTURE_DIM == 2
-    cudaBindTexture2D(0, tex2dfloat2, array_compute, channelDesc, NFREQUENCY*Nstation*NPOL, NTIME_PIPE, 
-		      NFREQUENCY*Nstation*NPOL*sizeof(ComplexInput));
-#else
-    cudaBindTexture(0, tex1dfloat2, array_compute, channelDesc, NFREQUENCY*Nstation*NPOL*NTIME_PIPE*sizeof(ComplexInput));
-#endif
     cudaStreamWaitEvent(streams[1], copyCompletion[(p+1)%2], 0); // only start the kernel once the h2d transfer is complete
     CUBE_ASYNC_KERNEL_CALL(shared2x2float2, dimGrid, dimBlock, 0, streams[1], 
-			   (float4*)matrix_real_d, (float4*)matrix_imag_d, Nstation, writeMatrix);
+			   (char2 *)array_compute, (int4*)matrix_real_d, (int4*)matrix_imag_d, Nstation, writeMatrix);
     cudaEventRecord(kernelCompletion[(p+1)%2], streams[1]); // record the completion of the h2d transfer
     checkCudaError();
 
@@ -541,15 +506,9 @@ void cudaXengine(Complex *matrix_h, ComplexInput *array_h) {
 
   array_compute = array_d[(PIPE_LENGTH+1)%2];
   // Final kernel calculation
-#if TEXTURE_DIM == 2
-  cudaBindTexture2D(0, tex2dfloat2, array_compute, channelDesc, NFREQUENCY*Nstation*NPOL, NTIME_PIPE, 
-		    NFREQUENCY*Nstation*NPOL*sizeof(ComplexInput));
-#else
-    cudaBindTexture(0, tex1dfloat2, array_compute, channelDesc, NFREQUENCY*Nstation*NPOL*NTIME_PIPE*sizeof(ComplexInput));
-#endif
   cudaStreamWaitEvent(streams[1], copyCompletion[(PIPE_LENGTH+1)%2], 0);
-  CUBE_ASYNC_KERNEL_CALL(shared2x2float2, dimGrid, dimBlock, 0, streams[1], (float4*)matrix_real_d, (float4*)matrix_imag_d,
-			 Nstation, writeMatrix);
+  CUBE_ASYNC_KERNEL_CALL(shared2x2float2, dimGrid, dimBlock, 0, streams[1],
+      (char2 *)array_compute, (int4*)matrix_real_d, (int4*)matrix_imag_d, Nstation, writeMatrix);
   checkCudaError();
 
   //copy the data back, employing a similar strategy as above

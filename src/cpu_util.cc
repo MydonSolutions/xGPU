@@ -1,9 +1,8 @@
 #include <math.h>
 
 // Normally distributed random numbers with standard deviation of 2.5,
-// quantized to integer values and saturated to the range -7.0 to +7.0.  For
-// the fixed point case, the values are then converted to ints, scaled by 16
-// (i.e. -112 to +112), and finally stored as signed chars.
+// quantized to integer values and saturated to the range -7 to +7, then scaled
+// by 16 (i.e. -112 to +112), and finally stored as signed chars.
 void random_complex(ComplexInput* random_num, int length) {
   double u1,u2,r,theta,a,b;
   double stddev=2.5;
@@ -25,11 +24,7 @@ void random_complex(ComplexInput* random_num, int length) {
     if(a < -7.0) a = -7.0;
     if(b >  7.0) b =  7.0;
     if(b < -7.0) b = -7.0;
-#ifndef FIXED_POINT
-    // Simulate 4 bit data that has been converted to floats
-    // (i.e. {-7.0, -6.0, ..., +6.0, +7.0})
-    random_num[i] = ComplexInput( a, b );
-#else
+
     // Simulate 4 bit data that has been multipled by 16 (via left shift by 4;
     // could multiply by 18 to maximize range, but that might be more expensive
     // than left shift by 4).
@@ -37,9 +32,7 @@ void random_complex(ComplexInput* random_num, int length) {
     random_num[i] = ComplexInput( ((int)a) << 4, ((int)b) << 4 );
 
     // Uncomment next line to simulate all zeros for every input.
-    // Interestingly, it does not give exactly zeros on the output.
     //random_num[i] = ComplexInput(0,0);
-#endif
   }
 }
 
@@ -64,7 +57,7 @@ void reorderMatrix(Complex *matrix) {
 		size_t tri_index = (k*NPOL+pol1)*NPOL+pol2;
 		size_t reg_index = (l*NPOL+pol1)*NPOL+pol2;
 		tmp[tri_index] = 
-		  Complex(((float*)matrix)[reg_index], ((float*)matrix)[reg_index+matLength]);
+		  Complex(((int*)matrix)[reg_index], ((int*)matrix)[reg_index+matLength]);
 	      }
 	    }
 	  }
@@ -90,7 +83,7 @@ void reorderMatrix(Complex *matrix) {
         for (int pol1=0; pol1<NPOL; pol1++) {
 	  for (int pol2=0; pol2<NPOL; pol2++) {
 	    size_t index = (k*NPOL+pol1)*NPOL+pol2;
-	    tmp[index] = Complex(((float*)matrix)[index], ((float*)matrix)[index+matLength]);
+	    tmp[index] = Complex(((int*)matrix)[index], ((int*)matrix)[index+matLength]);
 	  }
 	}
       }
@@ -111,18 +104,13 @@ void reorderMatrix(Complex *matrix) {
 // verbsoe=1 means print each differing basline/channel.
 // verbose=2 and array_h!=0 means print each differing baseline and each input
 //           sample that contributed to it.
-#ifndef FIXED_POINT
-#define TOL 1e-12
-#else
-#define TOL 1e-5
-#endif // FIXED_POINT
 void checkResult(Complex *gpu, Complex *cpu, int verbose=0, ComplexInput *array_h=0) {
 
-  printf("Checking result (tolerance == %g)...\n", TOL); fflush(stdout);
+  printf("Checking result...\n"); fflush(stdout);
 
   int errorCount=0;
-  double error = 0.0;
-  double maxError = 0.0;
+  Complex error = Complex(0,0);
+  Complex maxError = Complex(0,0);
 
   for(int i=0; i<NSTATION; i++){
     for (int j=0; j<=i; j++) {
@@ -131,18 +119,14 @@ void checkResult(Complex *gpu, Complex *cpu, int verbose=0, ComplexInput *array_
 	  for(int f=0; f<NFREQUENCY; f++){
 	    int k = f*(NSTATION+1)*(NSTATION/2) + i*(i+1)/2 + j;
 	    int index = (k*NPOL+pol1)*NPOL+pol2;
-	    if(abs(cpu[index]) == 0) {
-	      error = abs(gpu[index]);
-	    } else {
-	      error = abs(cpu[index] - gpu[index]) / abs(cpu[index]);
-	    }
-	    if(error > maxError) {
-	      maxError = error;
-	    }
-	    if(error > TOL) {
+	    if(real(cpu[index]) != real(gpu[index]) || imag(cpu[index]) != imag(gpu[index])) {
+	      error = cpu[index] - gpu[index];
+	      if(abs(error) > abs(maxError)) {
+	        maxError = error;
+	      }
               if(verbose > 0) {
-                printf("%d %d %d %d %d %d %d %g  %g  %g  %g (%g %g)\n", f, i, j, k, pol1, pol2, index,
-                       real(cpu[index]), real(gpu[index]), imag(cpu[index]), imag(gpu[index]), abs(cpu[index]), abs(gpu[index]));
+                printf("%d %d %d %d %d %d %d %d  %d  %d  %d\n", f, i, j, k, pol1, pol2, index,
+                       real(cpu[index]), real(gpu[index]), imag(cpu[index]), imag(gpu[index]));
                 if(verbose > 1 && array_h) {
                   Complex sum(0,0);
                   for(int t=0; t<NTIME; t++) {
@@ -150,12 +134,12 @@ void checkResult(Complex *gpu, Complex *cpu, int verbose=0, ComplexInput *array_
                     ComplexInput in1 = array_h[t*NFREQUENCY*NSTATION*2 + f*NSTATION*2 + j*2 + pol2];
                     Complex prod = convert(in0) * conj(convert(in1));
                     sum += prod;
-                    printf(" %4d (%4g,%4g) (%4g,%4g) -> (%6g, %6g)\n", t,
-                        (float)real(in0), (float)imag(in0),
-                        (float)real(in1), (float)imag(in1),
-                        (float)real(prod), (float)imag(prod));
+                    printf(" %4d (%4d,%4d) (%4d,%4d) -> (%6d, %6d)\n", t,
+                        real(in0), imag(in0),
+                        real(in1), imag(in1),
+                        real(prod), imag(prod));
                   }
-                  printf("                                 (%6g, %6g)\n", real(sum), imag(sum));
+                  printf("                                 (%6d, %6d)\n", real(sum), imag(sum));
                 }
               }
 	      errorCount++;
@@ -167,9 +151,9 @@ void checkResult(Complex *gpu, Complex *cpu, int verbose=0, ComplexInput *array_
   }
 
   if (errorCount) {
-    printf("Outer product summation failed with %d deviations (max error %g)\n\n", errorCount, maxError);
+    printf("Outer product summation failed with %d deviations [max error (%d, %d)]\n\n", errorCount, real(maxError), imag(maxError));
   } else {
-    printf("Outer product summation successful (max error %g)\n\n", maxError);
+    printf("Outer product summation successful [max error [%d, %d])\n\n", real(maxError), imag(maxError));
   }
 
 }

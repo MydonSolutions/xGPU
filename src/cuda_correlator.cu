@@ -16,20 +16,10 @@
 
 #define USE_GPU
 
-// uncomment to use 8-bit fixed point, comment out for 32-bit floating point
-
-#define FIXED_POINT
-
 // set the data type accordingly
-#ifndef FIXED_POINT
-typedef std::complex<float> ComplexInput;
-#define COMPLEX_INPUT float2
-#define SCALE 1.0f // no rescale required for FP32
-#else
 typedef std::complex<char> ComplexInput;
 #define COMPLEX_INPUT char2 
-#define SCALE 16129.0f // need to rescale result 
-#endif
+#define SCALE 1 // no need to rescale result 
 
 #define TRIANGULAR_ORDER 1000
 #define REAL_IMAG_TRIANGULAR_ORDER 2000
@@ -62,7 +52,7 @@ int writeMatrix = 1;
 // this must be enabled for this option to work though, slightly hurts performance
 //#define WRITE_OPTION 
 
-typedef std::complex<float> Complex;
+typedef std::complex<int> Complex;
 
 Complex convert(const ComplexInput &b) {
   return Complex(real(b), imag(b));
@@ -92,11 +82,6 @@ int main(int argc, char** argv) {
 
   printf("Correlating %llu stations with %llu signals, with %llu channels and integration length %llu\n",
 	 NSTATION, SAMPLES, NFREQUENCY, NTIME);
-#ifndef FIXED_POINT
-  printf("Sending floating point data to GPU.\n");
-#else
-  printf("Sending fixed point data to GPU.\n");
-#endif
 
   unsigned long long vecLength = NFREQUENCY * NTIME * NSTATION * NPOL;
 
