@@ -13,6 +13,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <stdint.h>
+#include <errno.h>
 
 #include "xgpu.h"
 #include "xgpu_info.h"
@@ -187,6 +188,7 @@ int xgpuInit(XGPUContext *context, int device_flags)
   XGPUInternalContext *internal = (XGPUInternalContext *)malloc(sizeof(XGPUInternalContext));
   if(!internal) {
     // Uh-oh!
+    errno = ENOMEM;
     return XGPU_OUT_OF_MEMORY;
   }
   context->internal = internal;
@@ -208,8 +210,8 @@ int xgpuInit(XGPUContext *context, int device_flags)
   int deviceCount;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
-    printf("No CUDA devices found");
-    exit(-1);
+    errno = ENODEV;
+    return XGPU_NOT_INITIALIZED;
   }
 
   cudaDeviceProp deviceProp;
@@ -302,11 +304,13 @@ int xgpuInit(XGPUContext *context, int device_flags)
 #ifdef DP4A
   if((NFREQUENCY * NSTATION * NPOL > deviceProp.maxTexture2DLinear[0]) ||
      (NTIME_PIPE/4 > deviceProp.maxTexture2DLinear[1])) {
+    errno = ENOMEM;
     return XGPU_INSUFFICIENT_TEXTURE_MEMORY;
   }
 #else
   if((NFREQUENCY * NSTATION * NPOL > deviceProp.maxTexture2DLinear[0]) ||
      (NTIME_PIPE > deviceProp.maxTexture2DLinear[1])) {
+    errno = ENOMEM;
     return XGPU_INSUFFICIENT_TEXTURE_MEMORY;
   }
 #endif
@@ -318,10 +322,12 @@ int xgpuInit(XGPUContext *context, int device_flags)
   // maxTexture1D returned by cudaGetDeviceProperties is wrong?
 #ifdef DP4A
   if (NFREQUENCY * NSTATION * NPOL * (NTIME_PIPE/4) > deviceProp.maxTexture1DLinear) {
+    errno = ENOMEM;
     return XGPU_INSUFFICIENT_TEXTURE_MEMORY;
   }
 #else
   if (NFREQUENCY * NSTATION * NPOL * NTIME_PIPE > deviceProp.maxTexture1DLinear) {
+    errno = ENOMEM;
     return XGPU_INSUFFICIENT_TEXTURE_MEMORY;
   }
 #endif
@@ -337,6 +343,7 @@ int xgpuClearDeviceIntegrationBuffer(XGPUContext *context)
 
   XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
   if(!internal) {
+    errno = EINVAL;
     return XGPU_NOT_INITIALIZED;
   }
   //assign the device
@@ -359,6 +366,7 @@ int xgpuSetHostInputBuffer(XGPUContext *context)
 
   XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
   if(!internal) {
+    errno = EINVAL;
     return XGPU_NOT_INITIALIZED;
   }
 
@@ -437,6 +445,7 @@ int xgpuSetHostOutputBuffer(XGPUContext *context)
 {
   XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
   if(!internal) {
+    errno = EINVAL;
     return XGPU_NOT_INITIALIZED;
   }
 
@@ -544,11 +553,13 @@ int xgpuCudaXengine(XGPUContext *context, int syncOp)
 {
   XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
   if(!internal) {
+    errno = EINVAL;
     return XGPU_NOT_INITIALIZED;
   }
 
   // xgpuSetHostInputBuffer and xgpuSetHostOutputBuffer must have been called
   if( !internal->array_h_set || !internal->matrix_h_set ) {
+    errno = EINVAL;
     return XGPU_HOST_BUFFER_NOT_SET;
   }
 
