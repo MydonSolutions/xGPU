@@ -218,6 +218,12 @@ void xgpuFree(XGPUContext *context);
 //                        complete, but does not dump.
 int xgpuCudaXengine(XGPUContext *context, int syncOp);
 
+// Wait for all transfer/compute activity to complete and then copy the
+// integration buffer from device memory to host memory at (context->matrix_h +
+// context->output_offset).  This is provided as an alternative to passing
+// SYNCOP_DUMP to xgpuCudaXengine().
+int xgpuDumpDeviceIntegrationBuffer(XGPUContext *context);
+
 // Functions in cpu_util.cc
 
 void xgpuRandomComplex(ComplexInput* random_num, long long unsigned int length);

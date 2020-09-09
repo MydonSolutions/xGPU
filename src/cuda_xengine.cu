@@ -686,3 +686,31 @@ int xgpuCudaXengine(XGPUContext *context, int syncOp)
 
   return XGPU_OK;
 }
+
+// Waits for all transfer/compute activity to complete and then copies the
+// integration buffer from device memory to host memory at (context->matrix_h +
+// context->output_offset).  This is provided as an alternative to passing
+// SYNCOP_DUMP to xgpuCudaXengine().
+int xgpuDumpDeviceIntegrationBuffer(XGPUContext *context)
+{
+  XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
+  if(!internal) {
+    errno = EINVAL;
+    return XGPU_NOT_INITIALIZED;
+  }
+
+  // xgpuSetHostInputBuffer and xgpuSetHostOutputBuffer must have been called
+  if( !internal->array_h_set || !internal->matrix_h_set ) {
+    errno = EINVAL;
+    return XGPU_HOST_BUFFER_NOT_SET;
+  }
+
+  //assign the device
+  cudaSetDevice(internal->device);
+
+  //copy the data back, employing a similar strategy as above
+  CUBE_COPY_CALL(context->matrix_h + context->output_offset, internal->matrix_d, compiletime_info.matLength*sizeof(Complex), cudaMemcpyDeviceToHost);
+  checkCudaError();
+
+  return XGPU_OK;
+}
