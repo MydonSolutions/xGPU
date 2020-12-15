@@ -75,7 +75,7 @@ void xgpuReorderMatrix(Complex *matrix) {
 	      for (pol2=0; pol2<NPOL; pol2++) {
 		size_t tri_index = (k*NPOL+pol1)*NPOL+pol2;
 		size_t reg_index = (l*NPOL+pol1)*NPOL+pol2;
-		//tmp[tri_index] = 
+		//tmp[tri_index] =
 		//  Complex(((float*)matrix)[reg_index], ((float*)matrix)[reg_index+matLength]);
 #ifndef DP4A
 		tmp[tri_index].real = ((float*)matrix)[reg_index];
@@ -91,14 +91,14 @@ void xgpuReorderMatrix(Complex *matrix) {
       }
     }
   }
-   
+
   memcpy(matrix, tmp, matLength*sizeof(Complex));
 
   free(tmp);
 
 #elif MATRIX_ORDER == REAL_IMAG_TRIANGULAR_ORDER
   // reorder the matrix from REAL_IMAG_TRIANGULAR_ORDER to TRIANGULAR_ORDER
-  
+
   int f, i, j, pol1, pol2;
   size_t matLength = NFREQUENCY * ((NSTATION+1)*(NSTATION/2)*NPOL*NPOL) * (NPULSAR + 1);
   Complex *tmp = malloc(matLength * sizeof(Complex));
@@ -233,7 +233,6 @@ void xgpuCheckResult(Complex *gpu, Complex *cpu, int verbose, ComplexInput *arra
 
 // reorder the input array - separate real/imag and corner turn in time, depth 4
 void xgpuSwizzleInput(ComplexInput *out, const ComplexInput *in) {
-  printf("Swizzling input\n");
 
   signed char *o = (signed char*)out;
   const signed char *i = (signed char*)in;

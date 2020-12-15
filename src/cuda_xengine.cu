@@ -217,11 +217,15 @@ int xgpuInit(XGPUContext *context, int device_flags)
   cudaDeviceProp deviceProp;
   for(int i=0; i<deviceCount; i++) {
     cudaGetDeviceProperties(&deviceProp, i);
+#ifdef VERBOSE
     printf("Found device %d: %s\n", i, deviceProp.name);
+#endif
   }
 
   cudaGetDeviceProperties(&deviceProp, internal->device);
+#ifdef VERBOSE
   printf("Using device %d: %s\n", internal->device, deviceProp.name);
+#endif
 
   //assign the device
   cudaSetDevice(internal->device);
