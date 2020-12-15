@@ -50,6 +50,7 @@ int main(int argc, char** argv) {
   XGPUInfo xgpu_info;
   unsigned int npol, nstation, nfrequency;
   int xgpu_error = 0;
+  ComplexInput *array_h = NULL;
   Complex *omp_matrix_h = NULL;
   struct timespec outer_start, start, stop, outer_stop;
   double total, per_call, max_bw, gbps;
@@ -159,9 +160,9 @@ int main(int argc, char** argv) {
   }
 
 #ifndef DP4A
-  ComplexInput *array_h = context.array_h; // this is pinned memory
+  array_h = context.array_h; // this is pinned memory
 #else
-  ComplexInput *array_h = malloc(context.array_len*sizeof(ComplexInput));
+  array_h = malloc(context.array_len*sizeof(ComplexInput));
 #endif
 
   Complex *cuda_matrix_h = context.matrix_h;
@@ -245,7 +246,7 @@ int main(int argc, char** argv) {
   }
 
 #if (CUBE_MODE == CUBE_DEFAULT)
-  
+
   // Only compare CPU and GPU X engines if dumping GPU X engine exactly once
   if(finalSyncOp == SYNCOP_DUMP && count*outer_count == 1) {
     xgpuReorderMatrix(cuda_matrix_h);
@@ -271,7 +272,9 @@ cleanup:
   xgpuFree(&context);
 
 #ifdef DP4A
-  free(array_h);
+  if(array_h) {
+    free(array_h);
+  }
 #endif
 
   if(hostAlloc) {
