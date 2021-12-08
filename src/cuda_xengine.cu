@@ -207,7 +207,7 @@ int xgpuInit(XGPUContext *context, int device_flags)
   long long unsigned int vecLengthPipe = compiletime_info.vecLengthPipe;
   long long unsigned int matLength = compiletime_info.matLength;
 
-  int deviceCount;
+  int deviceCount = 0;
   cudaGetDeviceCount(&deviceCount);
   if (deviceCount == 0) {
     errno = ENODEV;
