@@ -253,6 +253,28 @@ void xgpuSwizzleInput(ComplexInput *out, const ComplexInput *in) {
 
 }
 
+// Reorder GUPPI RAW input array - separate real/imag and corner turn in time, depth 4
+void xgpuSwizzleRawInput(ComplexInput *out, const ComplexInput *in, size_t tstride) {
+
+  signed char *o = (signed char*)out;
+  const signed char *i = (signed char*)in;
+  int t, f, s, p, c;
+
+  for(s=0; s<NSTATION; s++) {
+    for (f=0; f<NFREQUENCY; f++) {
+      for (t=0; t<NTIME; t++) {
+       for (p=0; p<NPOL; p++) {
+         for (c=0; c<2; c++) {
+           o[((((t/4*NFREQUENCY+f)*NSTATION+s)*NPOL+p)*2+c)*4+t%4] =
+             i[( ( (s*NFREQUENCY+f)*tstride+t )*NPOL+p )*2 + c];
+         }
+       }
+      }
+    }
+  }
+
+}
+
 // Extracts the full matrix from the packed Hermitian form
 void xgpuExtractMatrix(Complex *matrix, Complex *packed) {
 
