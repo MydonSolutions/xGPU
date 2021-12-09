@@ -260,8 +260,8 @@ void xgpuSwizzleRawInput(ComplexInput *out, const ComplexInput *in, size_t tstri
   const signed char *i = (signed char*)in;
   int t, f, s, p, c;
 
-  for(s=0; s<NSTATION; s++) {
-    for (f=0; f<NFREQUENCY; f++) {
+  for (f=0; f<NFREQUENCY; f++) {
+    for(s=0; s<NSTATION; s++) {
       for (t=0; t<NTIME; t++) {
        for (p=0; p<NPOL; p++) {
          for (c=0; c<2; c++) {
