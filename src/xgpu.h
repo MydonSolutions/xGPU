@@ -173,6 +173,12 @@ int xgpuInit(XGPUContext *context, int device_flags);
 // integration.
 int xgpuClearDeviceIntegrationBuffer(XGPUContext *context);
 
+// Specify internal->unregister_array_h.
+//
+// The previous internal->unregister_array_h is returned. This hack
+// enables one to avoid the deregistration of the previous array_h.
+ComplexInput* xgpuSetUnregisterArrayPtr(XGPUContext *context, ComplexInput* unregister_array_h);
+
 // Specify a new host input buffer.
 //
 // The previous host input buffer is freed or unregistered (as required) and

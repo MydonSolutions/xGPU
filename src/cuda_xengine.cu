@@ -361,6 +361,18 @@ int xgpuClearDeviceIntegrationBuffer(XGPUContext *context)
 #define ELAPSED_NS(start,stop) \
   (((int64_t)stop.tv_sec-start.tv_sec)*1000*1000*1000+(stop.tv_nsec-start.tv_nsec))
 
+ComplexInput* xgpuSetUnregisterArrayPtr(XGPUContext *context, ComplexInput* unregister_array_h)
+{
+  XGPUInternalContext *internal = (XGPUInternalContext *)context->internal;
+  if(!internal) {
+    errno = EINVAL;
+    return NULL;
+  }
+  ComplexInput* previously = internal->unregister_array_h;
+  internal->unregister_array_h = unregister_array_h;
+  return previously;
+}
+
 // Specify a new host input buffer.
 int xgpuSetHostInputBuffer(XGPUContext *context)
 {
